@@ -364,30 +364,7 @@ impl Settings {
             // File-based "advanced" options
             if let Some(advanced) = settings.advanced {
                 // 1. Custom HTTP headers assignment
-                let headers_entries = match advanced.headers {
-                    Some(headers_entries) => {
-                        let mut headers_vec: Vec<Headers> = Vec::new();
-
-                        // Compile a glob pattern for each header sources entry
-                        for headers_entry in headers_entries.iter() {
-                            let source = Glob::new(&headers_entry.source)
-                                .with_context(|| {
-                                    format!(
-                                        "can not compile glob pattern for header source: {}",
-                                        &headers_entry.source
-                                    )
-                                })?
-                                .compile_matcher();
-
-                            headers_vec.push(Headers {
-                                source,
-                                headers: headers_entry.headers.to_owned(),
-                            });
-                        }
-                        Some(headers_vec)
-                    }
-                    _ => None,
-                };
+                let headers_entries = Self::decode_headers(advanced.headers);
 
                 // 2. Rewrites assignment
                 let rewrites_entries = match advanced.rewrites {
@@ -604,6 +581,37 @@ impl Settings {
             },
             advanced: settings_advanced,
         })
+    }
+
+    /// decode headers. To be reused
+    pub fn decode_headers(
+        hdrs: Option<Vec<crate::settings::file::Headers>>,
+    ) -> Option<Vec<Headers>> {
+        return match hdrs {
+            Some(headers_entries) => {
+                let mut headers_vec: Vec<Headers> = Vec::new();
+
+                // Compile a glob pattern for each header sources entry
+                for headers_entry in headers_entries.iter() {
+                    let source = Glob::new(&headers_entry.source)
+                        .with_context(|| {
+                            format!(
+                                "can not compile glob pattern for header source: {}",
+                                &headers_entry.source
+                            )
+                        })
+                        .unwrap()
+                        .compile_matcher();
+
+                    headers_vec.push(Headers {
+                        source,
+                        headers: headers_entry.headers.to_owned(),
+                    });
+                }
+                Some(headers_vec)
+            }
+            _ => None,
+        };
     }
 }
 
