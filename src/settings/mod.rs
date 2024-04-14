@@ -367,52 +367,7 @@ impl Settings {
                 let headers_entries = Self::decode_headers(advanced.headers);
 
                 // 2. Rewrites assignment
-                let rewrites_entries = match advanced.rewrites {
-                    Some(rewrites_entries) => {
-                        let mut rewrites_vec: Vec<Rewrites> = Vec::new();
-
-                        // Compile a glob pattern for each rewrite sources entry
-                        for rewrites_entry in rewrites_entries.iter() {
-                            let source = Glob::new(&rewrites_entry.source)
-                                .with_context(|| {
-                                    format!(
-                                        "can not compile glob pattern for rewrite source: {}",
-                                        &rewrites_entry.source
-                                    )
-                                })?
-                                .compile_matcher();
-
-                            let pattern = source
-                                .glob()
-                                .regex()
-                                .trim_start_matches("(?-u)")
-                                .replace("?:.*", ".*")
-                                .replace("?:", "")
-                                .replace(".*.*", ".*")
-                                .to_owned();
-                            tracing::debug!(
-                                "url rewrites glob pattern: {}",
-                                &rewrites_entry.source
-                            );
-                            tracing::debug!("url rewrites regex equivalent: {}", pattern);
-
-                            let source = Regex::new(&pattern).with_context(|| {
-                                    format!(
-                                        "can not compile regex pattern equivalent for rewrite source: {}",
-                                        &pattern
-                                    )
-                                })?;
-
-                            rewrites_vec.push(Rewrites {
-                                source,
-                                destination: rewrites_entry.destination.to_owned(),
-                                redirect: rewrites_entry.redirect.to_owned(),
-                            });
-                        }
-                        Some(rewrites_vec)
-                    }
-                    _ => None,
-                };
+                let rewrites_entries = Self::decode_rewrites(advanced.rewrites);
 
                 // 3. Redirects assignment
                 let redirects_entries = match advanced.redirects {
@@ -609,6 +564,58 @@ impl Settings {
                     });
                 }
                 Some(headers_vec)
+            }
+            _ => None,
+        };
+    }
+
+    /// decode rewrites from file into settings
+    pub fn decode_rewrites(
+        rewrites: Option<Vec<crate::settings::file::Rewrites>>,
+    ) -> Option<Vec<Rewrites>> {
+        return match rewrites {
+            Some(rewrites_entries) => {
+                let mut rewrites_vec: Vec<Rewrites> = Vec::new();
+
+                // Compile a glob pattern for each rewrite sources entry
+                for rewrites_entry in rewrites_entries.iter() {
+                    let source = Glob::new(&rewrites_entry.source)
+                        .with_context(|| {
+                            format!(
+                                "can not compile glob pattern for rewrite source: {}",
+                                &rewrites_entry.source
+                            )
+                        })
+                        .unwrap()
+                        .compile_matcher();
+
+                    let pattern = source
+                        .glob()
+                        .regex()
+                        .trim_start_matches("(?-u)")
+                        .replace("?:.*", ".*")
+                        .replace("?:", "")
+                        .replace(".*.*", ".*")
+                        .to_owned();
+                    tracing::debug!("url rewrites glob pattern: {}", &rewrites_entry.source);
+                    tracing::debug!("url rewrites regex equivalent: {}", pattern);
+
+                    let source = Regex::new(&pattern)
+                        .with_context(|| {
+                            format!(
+                                "can not compile regex pattern equivalent for rewrite source: {}",
+                                &pattern
+                            )
+                        })
+                        .unwrap();
+
+                    rewrites_vec.push(Rewrites {
+                        source,
+                        destination: rewrites_entry.destination.to_owned(),
+                        redirect: rewrites_entry.redirect.to_owned(),
+                    });
+                }
+                Some(rewrites_vec)
             }
             _ => None,
         };
