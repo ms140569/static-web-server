@@ -639,7 +639,8 @@ impl Settings {
     }
 }
 
-fn read_file_settings(config_file: &Path) -> Result<Option<(FileSettings, PathBuf)>> {
+/// read the toml settings file
+pub fn read_file_settings(config_file: &Path) -> Result<Option<(FileSettings, PathBuf)>> {
     if config_file.is_file() {
         let file_path_resolved = config_file
             .canonicalize()

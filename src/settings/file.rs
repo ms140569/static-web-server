@@ -103,7 +103,7 @@ pub struct VirtualHosts {
 }
 
 /// Advanced server options only available in configuration file mode.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct Advanced {
     /// Headers
@@ -118,7 +118,7 @@ pub struct Advanced {
 
 /// General server options available in configuration file mode.
 /// Note that the `--config-file` option is excluded from itself.
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct General {
     /// Server address.
