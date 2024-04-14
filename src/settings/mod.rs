@@ -370,82 +370,10 @@ impl Settings {
                 let rewrites_entries = Self::decode_rewrites(advanced.rewrites);
 
                 // 3. Redirects assignment
-                let redirects_entries = match advanced.redirects {
-                    Some(redirects_entries) => {
-                        let mut redirects_vec: Vec<Redirects> = Vec::new();
+                let redirects_entries = Self::decode_redirects(advanced.redirects);
 
-                        // Compile a glob pattern for each redirect sources entry
-                        for redirects_entry in redirects_entries.iter() {
-                            let source = Glob::new(&redirects_entry.source)
-                                .with_context(|| {
-                                    format!(
-                                        "can not compile glob pattern for redirect source: {}",
-                                        &redirects_entry.source
-                                    )
-                                })?
-                                .compile_matcher();
-
-                            let pattern = source
-                                .glob()
-                                .regex()
-                                .trim_start_matches("(?-u)")
-                                .replace("?:.*", ".*")
-                                .replace("?:", "")
-                                .replace(".*.*", ".*")
-                                .to_owned();
-                            tracing::debug!(
-                                "url redirects glob pattern: {}",
-                                &redirects_entry.source
-                            );
-                            tracing::debug!("url redirects regex equivalent: {}", pattern);
-
-                            let source = Regex::new(&pattern).with_context(|| {
-                                    format!(
-                                        "can not compile regex pattern equivalent for redirect source: {}",
-                                        &pattern
-                                    )
-                                })?;
-
-                            let status_code = redirects_entry.kind.to_owned() as u16;
-                            redirects_vec.push(Redirects {
-                                host: redirects_entry.host.to_owned(),
-                                source,
-                                destination: redirects_entry.destination.to_owned(),
-                                kind: StatusCode::from_u16(status_code).with_context(|| {
-                                    format!("invalid redirect status code: {status_code}")
-                                })?,
-                            });
-                        }
-                        Some(redirects_vec)
-                    }
-                    _ => None,
-                };
-
-                // 3. Virtual hosts assignment
-                let vhosts_entries = match advanced.virtual_hosts {
-                    Some(vhosts_entries) => {
-                        let mut vhosts_vec: Vec<VirtualHosts> = Vec::new();
-
-                        for vhosts_entry in vhosts_entries.iter() {
-                            if let Some(root) = vhosts_entry.root.to_owned() {
-                                // Make sure path is valid
-                                let root_dir = helpers::get_valid_dirpath(&root)
-                                    .with_context(|| "root directory for virtual host was not found or inaccessible")?;
-                                tracing::debug!(
-                                    "added virtual host: {} -> {}",
-                                    vhosts_entry.host,
-                                    root_dir.display()
-                                );
-                                vhosts_vec.push(VirtualHosts {
-                                    host: vhosts_entry.host.to_owned(),
-                                    root: root_dir,
-                                });
-                            }
-                        }
-                        Some(vhosts_vec)
-                    }
-                    _ => None,
-                };
+                // 4. Virtual hosts assignment
+                let vhosts_entries = Self::decode_vhosts(advanced.virtual_hosts);
 
                 settings_advanced = Some(Advanced {
                     headers: headers_entries,
@@ -616,6 +544,95 @@ impl Settings {
                     });
                 }
                 Some(rewrites_vec)
+            }
+            _ => None,
+        };
+    }
+
+    /// decode redirects from file into settings
+    pub fn decode_redirects(
+        redirects: Option<Vec<crate::settings::file::Redirects>>,
+    ) -> Option<Vec<Redirects>> {
+        return match redirects {
+            Some(redirects_entries) => {
+                let mut redirects_vec: Vec<Redirects> = Vec::new();
+
+                // Compile a glob pattern for each redirect sources entry
+                for redirects_entry in redirects_entries.iter() {
+                    let source = Glob::new(&redirects_entry.source)
+                        .with_context(|| {
+                            format!(
+                                "can not compile glob pattern for redirect source: {}",
+                                &redirects_entry.source
+                            )
+                        })
+                        .unwrap()
+                        .compile_matcher();
+
+                    let pattern = source
+                        .glob()
+                        .regex()
+                        .trim_start_matches("(?-u)")
+                        .replace("?:.*", ".*")
+                        .replace("?:", "")
+                        .replace(".*.*", ".*")
+                        .to_owned();
+                    tracing::debug!("url redirects glob pattern: {}", &redirects_entry.source);
+                    tracing::debug!("url redirects regex equivalent: {}", pattern);
+
+                    let source = Regex::new(&pattern)
+                        .with_context(|| {
+                            format!(
+                                "can not compile regex pattern equivalent for redirect source: {}",
+                                &pattern
+                            )
+                        })
+                        .unwrap();
+
+                    let status_code = redirects_entry.kind.to_owned() as u16;
+                    redirects_vec.push(Redirects {
+                        host: redirects_entry.host.to_owned(),
+                        source,
+                        destination: redirects_entry.destination.to_owned(),
+                        kind: StatusCode::from_u16(status_code)
+                            .with_context(|| format!("invalid redirect status code: {status_code}"))
+                            .unwrap(),
+                    });
+                }
+                Some(redirects_vec)
+            }
+            _ => None,
+        };
+    }
+
+    /// decode vhosts from file into settings
+    pub fn decode_vhosts(
+        virtual_hosts: Option<Vec<crate::settings::file::VirtualHosts>>,
+    ) -> Option<Vec<VirtualHosts>> {
+        return match virtual_hosts {
+            Some(vhosts_entries) => {
+                let mut vhosts_vec: Vec<VirtualHosts> = Vec::new();
+
+                for vhosts_entry in vhosts_entries.iter() {
+                    if let Some(root) = vhosts_entry.root.to_owned() {
+                        // Make sure path is valid
+                        let root_dir = helpers::get_valid_dirpath(&root)
+                            .with_context(|| {
+                                "root directory for virtual host was not found or inaccessible"
+                            })
+                            .unwrap();
+                        tracing::debug!(
+                            "added virtual host: {} -> {}",
+                            vhosts_entry.host,
+                            root_dir.display()
+                        );
+                        vhosts_vec.push(VirtualHosts {
+                            host: vhosts_entry.host.to_owned(),
+                            root: root_dir,
+                        });
+                    }
+                }
+                Some(vhosts_vec)
             }
             _ => None,
         };
